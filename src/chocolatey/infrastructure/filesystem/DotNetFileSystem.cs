@@ -464,20 +464,6 @@ namespace chocolatey.infrastructure.filesystem
                 });
         }
 
-        // ReSharper disable InconsistentNaming
-
-        // http://msdn.microsoft.com/en-us/library/windows/desktop/aa363851.aspx
-        // http://www.pinvoke.net/default.aspx/kernel32.copyfile
-        /*
-            BOOL WINAPI CopyFile(
-              _In_  LPCTSTR lpExistingFileName,
-              _In_  LPCTSTR lpNewFileName,
-              _In_  BOOL bFailIfExists
-            );
-         */
-
-        // ReSharper restore InconsistentNaming
-
         public void DeleteFile(string filePath)
         {
             DeleteFile(filePath, isSilent: false);
