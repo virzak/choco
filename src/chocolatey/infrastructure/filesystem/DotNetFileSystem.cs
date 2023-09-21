@@ -34,6 +34,7 @@ namespace chocolatey.infrastructure.filesystem
     using tolerance;
     using Assembly = adapters.Assembly;
     using Environment = adapters.Environment;
+    using Windows.Win32;
 
     /// <summary>
     ///   Implementation of IFileSystem for Dot Net
@@ -396,7 +397,7 @@ namespace chocolatey.infrastructure.filesystem
             EnsureDirectoryExists(GetDirectoryName(destinationFilePath), ignoreError: true);
 
             //Private Declare Function apiCopyFile Lib "kernel32" Alias "CopyFileA" _
-            int success = CopyFileW(sourceFilePath, destinationFilePath, overwriteExisting ? 0 : 1);
+            int success = PInvoke.CopyFile(sourceFilePath, destinationFilePath, overwriteExisting);
             //if (success == 0)
             //{
             //    var error = Marshal.GetLastWin32Error();
@@ -474,9 +475,6 @@ namespace chocolatey.infrastructure.filesystem
               _In_  BOOL bFailIfExists
             );
          */
-
-        [DllImport("kernel32", SetLastError = true)]
-        private static extern int CopyFileW(string lpExistingFileName, string lpNewFileName, int bFailIfExists);
 
         // ReSharper restore InconsistentNaming
 
