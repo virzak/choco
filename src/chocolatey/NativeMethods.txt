@@ -12,3 +12,6 @@ CheckTokenMembership
 ConvertStringSidToSid
 GetTokenInformation
 TOKEN_ELEVATION_TYPE
+GetVersionEx
+OSVERSIONINFOEXW
+VER_NT_SERVER

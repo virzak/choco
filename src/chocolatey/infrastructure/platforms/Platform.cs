@@ -18,10 +18,11 @@ namespace chocolatey.infrastructure.platforms
 {
     using System;
     using System.ComponentModel;
-    using System.Runtime.InteropServices;
     using adapters;
     using filesystem;
     using Environment = adapters.Environment;
+    using static Windows.Win32.PInvoke;
+    using Windows.Win32.System.SystemInformation;
 
     /// <summary>
     ///   OS Platform detection
@@ -99,18 +100,19 @@ namespace chocolatey.infrastructure.platforms
         /// </summary>
         /// <param name="version">The version.</param>
         /// <remarks>Looked at http://www.csharp411.com/determine-windows-version-and-edition-with-c/</remarks>
-        private static string GetWindowsVersionName(Version version)
+        private unsafe static string GetWindowsVersionName(Version version)
         {
             var name = "Windows";
             var isServer = false;
 
-            var osVersionInfo = new OSVERSIONINFOEX();
-
-            osVersionInfo.dwOSVersionInfoSize = Marshal.SizeOf(typeof (OSVERSIONINFOEX));
-            var success = GetVersionEx(ref osVersionInfo);
+            var osVersionInfo = new OSVERSIONINFOEXW
+            {
+                dwOSVersionInfoSize = (uint)sizeof(OSVERSIONINFOEXW)
+            };
+            var success = GetVersionEx((OSVERSIONINFOW*)&osVersionInfo);
             if (success)
             {
-                isServer = osVersionInfo.wProductType == ServerNT;
+                isServer = osVersionInfo.wProductType == VER_NT_SERVER;
             }
 
 
@@ -138,63 +140,6 @@ namespace chocolatey.infrastructure.platforms
 
             return name;
         }
-
-        // ReSharper disable InconsistentNaming
-
-        private const int ServerNT = 3;
-
-        /*
-         https://msdn.microsoft.com/en-us/library/windows/desktop/ms724833.aspx
-
-         typedef struct _OSVERSIONINFOEX {
-            DWORD dwOSVersionInfoSize;
-            DWORD dwMajorVersion;
-            DWORD dwMinorVersion;
-            DWORD dwBuildNumber;
-            DWORD dwPlatformId;
-            TCHAR szCSDVersion[128];
-            WORD  wServicePackMajor;
-            WORD  wServicePackMinor;
-            WORD  wSuiteMask;
-            BYTE  wProductType;
-            BYTE  wReserved;
-         } OSVERSIONINFOEX, *POSVERSIONINFOEX, *LPOSVERSIONINFOEX;
-         */
-
-        // ReSharper disable MemberCanBePrivate.Local
-        // ReSharper disable FieldCanBeMadeReadOnly.Local
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "Part of the Windows API calls, and should not be changed.")]
-        [StructLayout(LayoutKind.Sequential)]
-        private struct OSVERSIONINFOEX
-        {
-            public int dwOSVersionInfoSize;
-            public int dwMajorVersion;
-            public int dwMinorVersion;
-            public int dwBuildNumber;
-            public int dwPlatformId;
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string szCSDVersion;
-            public short wServicePackMajor;
-            public short wServicePackMinor;
-            public short wSuiteMask;
-            public byte wProductType;
-            public byte wReserved;
-        }
-
-        // ReSharper restore FieldCanBeMadeReadOnly.Local
-        // ReSharper restore MemberCanBePrivate.Local
-
-        /*
-         https://msdn.microsoft.com/en-us/library/windows/desktop/ms724451.aspx
-         BOOL WINAPI GetVersionEx(
-            _Inout_  LPOSVERSIONINFO lpVersionInfo
-         );
-         */
-
-        [DllImport("kernel32.dll")]
-        private static extern bool GetVersionEx(ref OSVERSIONINFOEX osVersionInfo);
-
-        // ReSharper restore InconsistentNaming
 
 #pragma warning disable IDE1006
         [Obsolete("This overload is deprecated and will be removed in v3.")]
