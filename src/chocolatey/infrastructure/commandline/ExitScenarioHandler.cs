@@ -20,6 +20,7 @@ namespace chocolatey.infrastructure.commandline
     using System.Runtime.InteropServices;
     using logging;
     using platforms;
+    using static Windows.Win32.PInvoke;
 
     /// <summary>
     ///   Detect abnormal exit signals and log them
@@ -30,40 +31,23 @@ namespace chocolatey.infrastructure.commandline
     /// </remarks>
     public class ExitScenarioHandler
     {
-        [DllImport("Kernel32")]
-        private static extern bool SetConsoleCtrlHandler(EventHandler handler, bool add);
-
-        private delegate bool EventHandler(SignalControlType sig);
-
-        private static EventHandler _handler;
-
-        private enum SignalControlType
-        {
-            CTRL_C_EVENT = 0,
-            CTRL_BREAK_EVENT = 1,
-            CTRL_CLOSE_EVENT = 2,
-            CTRL_LOGOFF_EVENT = 5,
-            CTRL_SHUTDOWN_EVENT = 6
-        }
-
         public static void SetHandler()
         {
             if (Platform.GetPlatform() != PlatformType.Windows) return;
 
-            _handler += Handler;
-            SetConsoleCtrlHandler(_handler, true);
+            SetConsoleCtrlHandler(Handler, true);
         }
 
-        private static bool Handler(SignalControlType signal)
+        private static Windows.Win32.Foundation.BOOL Handler(uint signal)
         {
             const string errorMessage = @"Exiting chocolatey abnormally. Please manually clean up anything that
  was not finished.";
             switch (signal)
             {
-                case SignalControlType.CTRL_SHUTDOWN_EVENT:
+                case CTRL_SHUTDOWN_EVENT:
                     break;
-                case SignalControlType.CTRL_C_EVENT:
-                case SignalControlType.CTRL_CLOSE_EVENT:
+                case CTRL_C_EVENT:
+                case CTRL_CLOSE_EVENT:
                     "chocolatey".Log().Error(ChocolateyLoggers.Important, errorMessage);
                     "chocolatey".Log().Error("Please do not ever use Control+C or close the window to exit.");
                     break;
