@@ -18,10 +18,12 @@ namespace chocolatey.infrastructure.adapters
 {
     using System;
     using System.IO;
-    using System.Runtime.InteropServices;
     using app;
     using commandline;
     using platforms;
+    using Windows.Win32.Storage.FileSystem;
+    using Windows.Win32.System.Console;
+    using static Windows.Win32.PInvoke;
 
     /// <summary>
     /// Adapter for System.Console
@@ -269,7 +271,7 @@ namespace chocolatey.infrastructure.adapters
             {
                 if (!IsWindows()) return false;
 
-                return FileType.Char != GetFileType(GetStdHandle(StdHandle.StdOut));
+                return FILE_TYPE.FILE_TYPE_CHAR != GetFileType(GetStdHandle_SafeHandle(STD_HANDLE.STD_OUTPUT_HANDLE));
             }
         }
 
@@ -282,7 +284,7 @@ namespace chocolatey.infrastructure.adapters
             {
                 if (!IsWindows()) return false;
 
-                return FileType.Char != GetFileType(GetStdHandle(StdHandle.StdErr));
+                return FILE_TYPE.FILE_TYPE_CHAR != GetFileType(GetStdHandle_SafeHandle(STD_HANDLE.STD_ERROR_HANDLE));
             }
         }
 
@@ -295,7 +297,7 @@ namespace chocolatey.infrastructure.adapters
             {
                 if (!IsWindows()) return false;
 
-                return FileType.Char != GetFileType(GetStdHandle(StdHandle.StdIn));
+                return FILE_TYPE.FILE_TYPE_CHAR != GetFileType(GetStdHandle_SafeHandle(STD_HANDLE.STD_INPUT_HANDLE));
             }
         }
 
@@ -318,7 +320,7 @@ namespace chocolatey.infrastructure.adapters
             if (!IsWindows()) return defaultConsoleBuffer;
 
             CONSOLE_SCREEN_BUFFER_INFO csbi;
-            if (GetConsoleScreenBufferInfo(GetStdHandle(StdHandle.StdOut), out csbi))
+            if (GetConsoleScreenBufferInfo(GetStdHandle_SafeHandle(STD_HANDLE.STD_OUTPUT_HANDLE), out csbi))
             {
                 // if the console buffer exists
                 return csbi;
@@ -326,116 +328,5 @@ namespace chocolatey.infrastructure.adapters
 
             return defaultConsoleBuffer;
         }
-
-        /// <summary>
-        /// Contains information about a console screen buffer.
-        /// </summary>
-        /// <remarks>
-        /// https://msdn.microsoft.com/en-us/library/windows/desktop/ms682093.aspx
-        /// </remarks>
-        private struct CONSOLE_SCREEN_BUFFER_INFO
-        {
-            /// <summary> A CoOrd structure that contains the size of the console screen buffer, in character columns and rows. </summary>
-            internal COORD dwSize;
-            /// <summary> A CoOrd structure that contains the column and row coordinates of the cursor in the console screen buffer. </summary>
-            internal COORD dwCursorPosition;
-            /// <summary> The attributes of the characters written to a screen buffer by the WriteFile and WriteConsole functions, or echoed to a screen buffer by the ReadFile and ReadConsole functions. </summary>
-            internal System.Int16 wAttributes;
-            /// <summary> A SmallRect structure that contains the console screen buffer coordinates of the upper-left and lower-right corners of the display window. </summary>
-            internal SMALL_RECT srWindow;
-            /// <summary> A CoOrd structure that contains the maximum size of the console window, in character columns and rows, given the current screen buffer size and font and the screen size. </summary>
-            internal COORD dwMaximumWindowSize;
-        }
-
-        /// <summary>
-        /// Defines the coordinates of a character cell in a console screen buffer.
-        /// The origin of the coordinate system (0,0) is at the top, left cell of the buffer.
-        /// </summary>
-        /// <remarks>
-        /// https://msdn.microsoft.com/en-us/library/windows/desktop/ms682119.aspx
-        /// </remarks>
-        private struct COORD
-        {
-            /// <summary> The horizontal coordinate or column value. </summary>
-            internal System.Int16 X;
-            /// <summary> The vertical coordinate or row value. </summary>
-            internal System.Int16 Y;
-        }
-
-        /// <summary>
-        /// Defines the coordinates of the upper left and lower right corners of a rectangle.
-        /// </summary>
-        /// <remarks>
-        /// https://msdn.microsoft.com/en-us/library/windows/desktop/ms686311.aspx
-        /// </remarks>
-        private struct SMALL_RECT
-        {
-            /// <summary> The x-coordinate of the upper left corner of the rectangle. </summary>
-            internal System.Int16 Left;
-            /// <summary> The y-coordinate of the upper left corner of the rectangle. </summary>
-            internal System.Int16 Top;
-            /// <summary> The x-coordinate of the lower right corner of the rectangle. </summary>
-            internal System.Int16 Right;
-            /// <summary> The y-coordinate of the lower right corner of the rectangle. </summary>
-            internal System.Int16 Bottom;
-        }
-
-        private enum StdHandle
-        {
-            StdIn = -10,
-            StdOut = -11,
-            StdErr = -12,
-        };
-
-        /// <summary>
-        /// Retrieves information about the specified console screen buffer.
-        /// </summary>
-        /// <returns>
-        /// If the information retrieval succeeds, the return value is nonzero; else the return value is zero
-        /// </returns>
-        /// <remarks>
-        /// https://msdn.microsoft.com/en-us/library/windows/desktop/ms683171.aspx
-        /// </remarks>
-        [DllImport("kernel32.dll", EntryPoint = "GetConsoleScreenBufferInfo", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetConsoleScreenBufferInfo(System.IntPtr hConsoleOutput, out CONSOLE_SCREEN_BUFFER_INFO lpConsoleScreenBufferInfo);
-
-        /// <summary>
-        /// Retrieves a handle to the specified standard device (standard input, standard output, or standard error).
-        /// </summary>
-        /// <returns>
-        /// Returns a value that is a handle to the specified device, or a redirected handle
-        /// </returns>
-        /// <remarks>
-        /// https://msdn.microsoft.com/en-us/library/windows/desktop/ms683231.aspx
-        /// </remarks>
-        [DllImport("kernel32.dll", EntryPoint = "GetStdHandle", SetLastError = true)]
-        private static extern System.IntPtr GetStdHandle(StdHandle nStdHandle);
-
-        /// <summary>
-        /// Retrieves the file type of the specified file.
-        /// </summary>
-        /// <remarks>
-        /// https://msdn.microsoft.com/en-us/library/windows/desktop/aa364960.aspx
-        /// http://www.pinvoke.net/default.aspx/kernel32.getfiletype
-        /// </remarks>
-        [DllImport("kernel32.dll")]
-        private static extern FileType GetFileType(System.IntPtr hFile);
-
-        /// <remarks>
-        /// https://msdn.microsoft.com/en-us/library/windows/desktop/aa364960.aspx
-        /// </remarks>
-        private enum FileType
-        {
-            /// <summary> Either the type of the specified file is unknown, or the function failed. </summary>
-            Unknown,
-            /// <summary> The specified file is a disk file. </summary>
-            Disk,
-            /// <summary> The specified file is a character file, typically an LPT device or a console. </summary>
-            Char,
-            /// <summary> The specified file is a socket, a named pipe, or an anonymous pipe. </summary>
-            Pipe
-        };
-
     }
 }
