@@ -8,3 +8,7 @@ CTRL_CLOSE_EVENT
 CTRL_LOGOFF_EVENT
 CTRL_SHUTDOWN_EVENT
 CopyFileW
+CheckTokenMembership
+ConvertStringSidToSid
+GetTokenInformation
+TOKEN_ELEVATION_TYPE

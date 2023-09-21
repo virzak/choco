@@ -19,11 +19,15 @@ namespace chocolatey.infrastructure.information
     using System;
     using System.Runtime.InteropServices;
     using System.Security.Principal;
+    using Microsoft.Win32.SafeHandles;
     using platforms;
+    using Windows.Win32.Foundation;
+    using Windows.Win32.Security;
+    using static Windows.Win32.PInvoke;
 
     public sealed class ProcessInformation
     {
-        public static bool UserIsAdministrator()
+        public static unsafe bool UserIsAdministrator()
         {
             if (Platform.GetPlatform() != PlatformType.Windows) return false;
 
@@ -63,35 +67,28 @@ namespace chocolatey.infrastructure.information
                         "chocolatey".Log().Debug(@"User may be subject to UAC, checking for a split token (not 100%
  effective).");
 
-                        int tokenInfLength = Marshal.SizeOf(typeof(int));
-                        IntPtr tokenInformation = Marshal.AllocHGlobal(tokenInfLength);
+                        TOKEN_ELEVATION_TYPE elevationType;
 
-                        try
+                        using (var token = new SafeFileHandle(identity.Token, false))
                         {
-                            var token = identity.Token;
-                            var successfulCall = GetTokenInformation(token, TokenInformationType.TokenElevationType, tokenInformation, tokenInfLength, out tokenInfLength);
+
+                            var successfulCall = GetTokenInformation(token, TOKEN_INFORMATION_CLASS.TokenElevationType, &elevationType, sizeof(TOKEN_ELEVATION_TYPE), out var tokenInfLength);
 
                             if (!successfulCall)
                             {
                                 "chocolatey".Log().Warn("Error during native GetTokenInformation call - {0}".FormatWith(Marshal.GetLastWin32Error()));
-                                if (tokenInformation != IntPtr.Zero) Marshal.FreeHGlobal(tokenInformation);
                             }
 
-                            var elevationType = (TokenElevationType)Marshal.ReadInt32(tokenInformation);
 
                             switch (elevationType)
                             {
                                 // TokenElevationTypeFull - User has a split token, and the process is running elevated. Assuming they're an administrator.
-                                case TokenElevationType.TokenElevationTypeFull:
+                                case TOKEN_ELEVATION_TYPE.TokenElevationTypeFull:
                                 // TokenElevationTypeLimited - User has a split token, but the process is not running elevated. Assuming they're an administrator.
-                                case TokenElevationType.TokenElevationTypeLimited:
+                                case TOKEN_ELEVATION_TYPE.TokenElevationTypeLimited:
                                     isAdmin = true;
                                     break;
                             }
-                        }
-                        finally
-                        {
-                            if (tokenInformation != IntPtr.Zero) Marshal.FreeHGlobal(tokenInformation);
                         }
                     }
                 }
@@ -128,7 +125,7 @@ namespace chocolatey.infrastructure.information
 
         public static bool UserIsSystem()
         {
-             if (Platform.GetPlatform() != PlatformType.Windows) return false;
+            if (Platform.GetPlatform() != PlatformType.Windows) return false;
 
             var isSystem = false;
 
@@ -138,92 +135,6 @@ namespace chocolatey.infrastructure.information
             }
 
             return isSystem;
-        }
-
-        /*
-         https://msdn.microsoft.com/en-us/library/windows/desktop/aa376402.aspx
-         BOOL WINAPI ConvertStringSidToSid(
-           _In_   LPCTSTR StringSid,
-           _Out_  PSID *Sid
-         );
-         */
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool ConvertStringSidToSid(string stringSid, out IntPtr sid);
-
-        /*
-         https://msdn.microsoft.com/en-us/library/windows/desktop/aa376389.aspx
-         BOOL WINAPI CheckTokenMembership(
-            _In_opt_  HANDLE TokenHandle,
-            _In_      PSID SidToCheck,
-            _Out_     PBOOL IsMember
-         );
-
-         */
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool CheckTokenMembership(IntPtr tokenHandle, IntPtr sidToCheck, out bool isMember);
-
-        /*
-          https://msdn.microsoft.com/en-us/library/windows/desktop/aa446671.aspx
-          BOOL WINAPI GetTokenInformation(
-            _In_       HANDLE TokenHandle,
-            _In_       TOKEN_INFORMATION_CLASS TokenInformationClass,
-            _Out_opt_  LPVOID TokenInformation,
-            _In_       DWORD TokenInformationLength,
-            _Out_      PDWORD ReturnLength
-          );
-
-
-        */
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool GetTokenInformation(IntPtr tokenHandle, TokenInformationType tokenInformationClass, IntPtr tokenInformation, int tokenInformationLength, out int returnLength);
-
-        /// <summary>
-        /// Passed to <see cref="GetTokenInformation"/> to specify what
-        /// information about the token to return.
-        /// </summary>
-        enum TokenInformationType
-        {
-            TokenUser = 1,
-            TokenGroups,
-            TokenPrivileges,
-            TokenOwner,
-            TokenPrimaryGroup,
-            TokenDefaultDacl,
-            TokenSource,
-            TokenType,
-            TokenImpersonationLevel,
-            TokenStatistics,
-            TokenRestrictedSids,
-            TokenSessionId,
-            TokenGroupsAndPrivileges,
-            TokenSessionReference,
-            TokenSandBoxInert,
-            TokenAuditPolicy,
-            TokenOrigin,
-            TokenElevationType,
-            TokenLinkedToken,
-            TokenElevation,
-            TokenHasRestrictions,
-            TokenAccessInformation,
-            TokenVirtualizationAllowed,
-            TokenVirtualizationEnabled,
-            TokenIntegrityLevel,
-            TokenUiAccess,
-            TokenMandatoryPolicy,
-            TokenLogonSid,
-            MaxTokenInfoClass
-        }
-
-        /// <summary>
-        /// The elevation type for a user token.
-        /// </summary>
-        enum TokenElevationType
-        {
-            TokenElevationTypeDefault = 1,
-            TokenElevationTypeFull,
-            TokenElevationTypeLimited
         }
 
 #pragma warning disable IDE1006
